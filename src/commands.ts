@@ -21,10 +21,14 @@ export const commands: RESTPutAPIApplicationCommandsJSONBody = [
     description: "Give someone kudos",
     options: [
       {
-        type: ApplicationCommandOptionType.User,
+        // Text with autocomplete rather than a User option, so it suggests
+        // members but also takes any name ("the ops team").
+        type: ApplicationCommandOptionType.String,
         name: "user",
-        description: "Who are you thanking?",
+        description: "Who are you thanking? Pick a member or type any name",
         required: true,
+        autocomplete: true,
+        max_length: 100,
       },
       {
         type: ApplicationCommandOptionType.String,
@@ -59,9 +63,11 @@ export const commands: RESTPutAPIApplicationCommandsJSONBody = [
     description: "Someone's kudos total and recent reasons",
     options: [
       {
-        type: ApplicationCommandOptionType.User,
+        type: ApplicationCommandOptionType.String,
         name: "user",
-        description: "Whose history (default: yours)",
+        description: "Whose history: a member or any name (default: yours)",
+        autocomplete: true,
+        max_length: 100,
       },
     ],
   },

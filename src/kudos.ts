@@ -1,10 +1,13 @@
 import {
   ApplicationCommandOptionType,
+  InteractionResponseType,
+  type APIApplicationCommandAutocompleteInteraction,
+  type APIApplicationCommandAutocompleteResponse,
   type APIChatInputApplicationCommandGuildInteraction,
   type APIInteractionResponse,
 } from "discord-api-types/v10";
 import type { KudosEnv } from "../alchemy.run.ts";
-import { postMessage, reply } from "./discord.ts";
+import { postMessage, reply, searchMembers } from "./discord.ts";
 
 type Interaction = APIChatInputApplicationCommandGuildInteraction;
 type Handler = (
@@ -39,23 +42,33 @@ const isPeriod = (value: string): value is keyof typeof PERIODS => Object.hasOwn
 const server = (interaction: Interaction, env: KudosEnv) =>
   env.KUDOS.getByName(interaction.guild_id);
 
+/**
+ * Who a `user` option names: a member (picked from autocomplete, or a pasted
+ * mention) becomes their mention `<@id>`; anything else is a name, as typed.
+ */
+export function recipient(raw: string) {
+  const mention = /^<@!?(\d+)>$/.exec(raw.trim());
+  if (mention) return { token: `<@${mention[1]}>`, userId: mention[1] };
+  return { token: raw.trim().replace(/\s+/g, " "), userId: undefined };
+}
+
 const give: Handler = async (interaction, env, ctx) => {
   const channel = interaction.channel.id;
   const from = interaction.member.user.id;
-  const to = option(interaction, "user");
+  const to = recipient(option(interaction, "user") ?? "");
   const reason = option(interaction, "reason");
 
-  if (!to || !reason) return reply("Who, and what for?", { ephemeral: true });
-  if (to === from) return reply("You can't give yourself kudos.", { ephemeral: true });
+  if (!to.token || !reason) return reply("Who, and what for?", { ephemeral: true });
+  if (to.userId === from) return reply("You can't give yourself kudos.", { ephemeral: true });
 
   const { total, kudosChannel } = await server(interaction, env).give({
     channel,
     from,
-    to,
+    to: to.token,
     reason,
   });
 
-  const content = `Kudos to <@${to}> from <@${from}> 🙏 (${total} total)\n> ${reason}`;
+  const content = `Kudos to ${to.token} from <@${from}> 🙏 (${total} total)\n> ${reason}`;
   if (kudosChannel && kudosChannel !== channel) {
     ctx.waitUntil(
       postMessage(env.DISCORD_BOT_TOKEN, kudosChannel, `${content}\nin <#${channel}>`).catch((e) =>
@@ -63,7 +76,7 @@ const give: Handler = async (interaction, env, ctx) => {
       ),
     );
   }
-  return reply(content, { mentions: { users: [to] } });
+  return reply(content, { mentions: { users: to.userId ? [to.userId] : [] } });
 };
 
 const leaderboard: Handler = async (interaction, env) => {
@@ -75,17 +88,19 @@ const leaderboard: Handler = async (interaction, env) => {
   const results = await server(interaction, env).leaderboard(since);
 
   if (!results.length) return reply(`No kudos ${period.label} yet.`);
-  const lines = results.map((r, i) => `${i + 1}. <@${r.to_user}> · ${r.n} kudos`);
+  const lines = results.map((r, i) => `${i + 1}. ${r.to_user} · ${r.n} kudos`);
   return reply(`**Kudos leaderboard ${period.label}**\n${lines.join("\n")}`);
 };
 
 const history: Handler = async (interaction, env) => {
-  const user = option(interaction, "user") ?? interaction.member.user.id;
+  const { token: user } = recipient(
+    option(interaction, "user") ?? `<@${interaction.member.user.id}>`,
+  );
   const { total, recent } = await server(interaction, env).history(user);
-  if (!total) return reply(`<@${user}> has no kudos yet.`, { ephemeral: true });
+  if (!total) return reply(`${user} has no kudos yet.`, { ephemeral: true });
 
   const lines = recent.map((r) => `- ${r.reason} (from <@${r.from_user}>, <t:${r.created_at}:R>)`);
-  return reply(`<@${user}> has ${total} kudos. Most recent:\n${lines.join("\n")}`, {
+  return reply(`${user} has ${total} kudos. Most recent:\n${lines.join("\n")}`, {
     ephemeral: true,
   });
 };
@@ -122,3 +137,50 @@ export const handlers = {
 
 export const isCommand = (name: string): name is keyof typeof handlers =>
   Object.hasOwn(handlers, name);
+
+/**
+ * Suggestions for a `user` option as it's typed: matching members, then past
+ * recipients, then the typed text itself, since any name is accepted.
+ */
+export async function suggestRecipients(
+  interaction: APIApplicationCommandAutocompleteInteraction,
+  env: KudosEnv,
+  ctx: ExecutionContext,
+): Promise<APIApplicationCommandAutocompleteResponse> {
+  const guild = interaction.guild_id ?? "";
+  const focused = interaction.data.options.find(
+    (o) => o.type === ApplicationCommandOptionType.String && o.focused,
+  );
+  const typed = focused?.type === ApplicationCommandOptionType.String ? focused.value.trim() : "";
+  const stub = env.KUDOS.getByName(guild);
+
+  const [members, past] = await Promise.all([
+    typed
+      ? searchMembers(env.DISCORD_BOT_TOKEN, guild, typed, 10).catch((e) => {
+          console.error("[autocomplete] member search failed", e);
+          return [];
+        })
+      : [],
+    stub.suggest(typed),
+  ]);
+
+  const seen = members.map((m) => ({
+    token: `<@${m.user.id}>`,
+    name: m.nick ?? m.user.global_name ?? m.user.username,
+  }));
+  if (seen.length) ctx.waitUntil(stub.rememberNames(seen));
+
+  const choices = new Map<string, string>();
+  for (const { token, name } of [...seen, ...past])
+    if (!choices.has(token)) choices.set(token, name);
+  if (typed && !choices.has(typed)) choices.set(typed, typed);
+
+  return {
+    type: InteractionResponseType.ApplicationCommandAutocompleteResult,
+    data: {
+      choices: [...choices]
+        .slice(0, 25)
+        .map(([value, name]) => ({ name: name.slice(0, 100), value })),
+    },
+  };
+}

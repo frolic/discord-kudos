@@ -4,18 +4,24 @@ import type { KudosEnv } from "../alchemy.run.ts";
 // Each Discord server gets its own object (and its own SQLite database), so
 // one server's data never shares storage with another's. Row shapes are
 // `type`s, not interfaces, because sql.exec<T> needs an index signature.
+//
+// A recipient (`to_user`) is either a member, stored as their mention `<@id>`,
+// or any other name as typed ("the ops team", matched case-insensitively).
+// Both render as-is in a message.
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS kudos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     channel_id TEXT NOT NULL,
     from_user TEXT NOT NULL,
-    to_user TEXT NOT NULL,
+    to_user TEXT NOT NULL COLLATE NOCASE,
     reason TEXT NOT NULL,
     created_at INTEGER NOT NULL DEFAULT (unixepoch())
   );
   CREATE INDEX IF NOT EXISTS kudos_to ON kudos (to_user, created_at);
   CREATE INDEX IF NOT EXISTS kudos_time ON kudos (created_at);
   CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
+  -- Display names of members seen in autocomplete, to suggest past recipients.
+  CREATE TABLE IF NOT EXISTS names (token TEXT PRIMARY KEY, name TEXT NOT NULL);
 `;
 
 export interface Kudos {
@@ -34,6 +40,11 @@ export type Received = {
   from_user: string;
   reason: string;
   created_at: number;
+};
+
+export type Suggestion = {
+  token: string;
+  name: string;
 };
 
 type Count = {
@@ -69,7 +80,7 @@ export class KudosServer extends DurableObject<KudosEnv> {
     return this.sql
       .exec<Ranked>(
         `SELECT to_user, COUNT(*) AS n FROM kudos WHERE created_at >= ?
-         GROUP BY to_user ORDER BY n DESC, MAX(created_at) DESC LIMIT 10`,
+         GROUP BY to_user ORDER BY n DESC, MAX(created_at) DESC, MAX(id) DESC LIMIT 10`,
         since,
       )
       .toArray();
@@ -85,6 +96,34 @@ export class KudosServer extends DurableObject<KudosEnv> {
       )
       .toArray();
     return { total: this.total(user), recent };
+  }
+
+  /**
+   * Past recipients whose name starts with `prefix`, most recently thanked
+   * first. Members appear only once autocomplete has learned their name.
+   */
+  suggest(prefix: string): Suggestion[] {
+    return this.sql
+      .exec<Suggestion>(
+        `SELECT k.to_user AS token, COALESCE(n.name, k.to_user) AS name FROM kudos k
+         LEFT JOIN names n ON n.token = k.to_user
+         WHERE (n.name IS NOT NULL OR k.to_user NOT LIKE '<@%')
+           AND COALESCE(n.name, k.to_user) LIKE ? ESCAPE '\\'
+         GROUP BY k.to_user ORDER BY MAX(k.id) DESC LIMIT 25`,
+        `${prefix.replace(/[\\%_]/g, "\\$&")}%`,
+      )
+      .toArray();
+  }
+
+  /** Remembers members' display names for {@link suggest}. */
+  rememberNames(names: Suggestion[]) {
+    for (const { token, name } of names) {
+      this.sql.exec(
+        "INSERT INTO names (token, name) VALUES (?, ?) ON CONFLICT (token) DO UPDATE SET name = excluded.name",
+        token,
+        name,
+      );
+    }
   }
 
   /** Sets the channel every kudos is echoed to, or turns it off with null. */

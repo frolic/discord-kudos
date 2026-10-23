@@ -7,7 +7,7 @@ import {
 } from "discord-api-types/v10";
 import type { KudosEnv } from "../alchemy.run.ts";
 import { reply, verify } from "./discord.ts";
-import { handlers, isCommand } from "./kudos.ts";
+import { handlers, isCommand, suggestRecipients } from "./kudos.ts";
 
 const isGuildCommand = (
   interaction: APIInteraction,
@@ -28,6 +28,9 @@ export default {
     const interaction: APIInteraction = JSON.parse(body);
     if (interaction.type === InteractionType.Ping) {
       return Response.json({ type: InteractionResponseType.Pong });
+    }
+    if (interaction.type === InteractionType.ApplicationCommandAutocomplete) {
+      return Response.json(await suggestRecipients(interaction, env, ctx));
     }
     if (isGuildCommand(interaction) && isCommand(interaction.data.name)) {
       return Response.json(await handlers[interaction.data.name](interaction, env, ctx));

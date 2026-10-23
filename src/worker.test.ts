@@ -9,6 +9,7 @@ import {
   ApplicationCommandOptionType,
   ApplicationCommandType,
   InteractionType,
+  type APIApplicationCommandAutocompleteResponse,
   type APIInteractionResponseChannelMessageWithSource,
 } from "discord-api-types/v10";
 import worker from "./worker.ts";
@@ -59,11 +60,12 @@ async function send(body: TestInteraction, sign = true) {
   return res;
 }
 
-type Opt = { name: string; type: ApplicationCommandOptionType; value: string };
-const user = (name: string, value: string): Opt => ({
+type Opt = { name: string; type: ApplicationCommandOptionType; value: string; focused?: boolean };
+// Member options are text with autocomplete; a picked member arrives as a mention.
+const user = (name: string, id: string): Opt => ({
   name,
-  type: ApplicationCommandOptionType.User,
-  value,
+  type: ApplicationCommandOptionType.String,
+  value: `<@${id}>`,
 });
 const str = (name: string, value: string): Opt => ({
   name,
@@ -111,52 +113,49 @@ describe("interactions endpoint", () => {
 
 describe("/kudos", () => {
   it("counts per user per server and pings only the receiver", async () => {
-    const first = await command("g1", "alice", "kudos", [
-      user("user", "bob"),
+    const first = await command("g1", "101", "kudos", [
+      user("user", "102"),
       str("reason", "shipped it"),
     ]);
-    expect(first.content).toBe("Kudos to <@bob> from <@alice> 🙏 (1 total)\n> shipped it");
-    expect(first.allowed_mentions).toEqual({ users: ["bob"] });
+    expect(first.content).toBe("Kudos to <@102> from <@101> 🙏 (1 total)\n> shipped it");
+    expect(first.allowed_mentions).toEqual({ users: ["102"] });
 
-    const second = await command("g1", "carol", "kudos", [
-      user("user", "bob"),
+    const second = await command("g1", "103", "kudos", [
+      user("user", "102"),
       str("reason", "reviews"),
     ]);
     expect(second.content).toContain("(2 total)");
 
-    const otherServer = await command("g2", "carol", "kudos", [
-      user("user", "bob"),
+    const otherServer = await command("g2", "103", "kudos", [
+      user("user", "102"),
       str("reason", "hi"),
     ]);
     expect(otherServer.content).toContain("(1 total)");
   });
 
   it("refuses self kudos but lets bots collect them", async () => {
-    const self = await command("g3", "alice", "kudos", [
-      user("user", "alice"),
-      str("reason", "me"),
-    ]);
+    const self = await command("g3", "101", "kudos", [user("user", "101"), str("reason", "me")]);
     expect(self.content).toMatch(/yourself/);
     expect(self.flags).toBe(64);
 
     const bot = await command(
       "g3",
-      "alice",
+      "101",
       "kudos",
-      [user("user", "robo"), str("reason", "beep")],
-      ["robo"],
+      [user("user", "109"), str("reason", "beep")],
+      ["109"],
     );
-    expect(bot.content).toContain("Kudos to <@robo> from <@alice> 🙏 (1 total)");
+    expect(bot.content).toContain("Kudos to <@109> from <@101> 🙏 (1 total)");
   });
 
   it("broadcasts to the kudos channel once one is set", async () => {
     const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
 
-    const set = await command("g4", "admin", "kudos-channel", [chan("channel", "shoutouts")]);
+    const set = await command("g4", "108", "kudos-channel", [chan("channel", "shoutouts")]);
     expect(set.content).toContain("<#shoutouts>");
     expect(fetch).toHaveBeenCalledTimes(1); // the test post
 
-    await command("g4", "alice", "kudos", [user("user", "bob"), str("reason", "pairing")]);
+    await command("g4", "101", "kudos", [user("user", "102"), str("reason", "pairing")]);
     expect(fetch).toHaveBeenCalledTimes(2);
     const [url, init] = fetch.mock.calls[1]!;
     expect(String(url)).toBe("https://discord.com/api/v10/channels/shoutouts/messages");
@@ -165,8 +164,8 @@ describe("/kudos", () => {
     expect(body.content).toContain("pairing");
     expect(body.allowed_mentions).toEqual({ parse: [] });
 
-    await command("g4", "admin", "kudos-channel");
-    await command("g4", "alice", "kudos", [user("user", "bob"), str("reason", "again")]);
+    await command("g4", "108", "kudos-channel");
+    await command("g4", "101", "kudos", [user("user", "102"), str("reason", "again")]);
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
@@ -174,10 +173,10 @@ describe("/kudos", () => {
     const fetch = vi
       .spyOn(globalThis, "fetch")
       .mockImplementation(async () => new Response("Missing Access", { status: 403 }));
-    const res = await command("g5", "admin", "kudos-channel", [chan("channel", "locked")]);
+    const res = await command("g5", "108", "kudos-channel", [chan("channel", "locked")]);
     expect(res.content).toMatch(/can't post/);
     // Nothing was saved, so a kudos isn't echoed anywhere.
-    await command("g5", "alice", "kudos", [user("user", "bob"), str("reason", "hi")]);
+    await command("g5", "101", "kudos", [user("user", "102"), str("reason", "hi")]);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
@@ -185,33 +184,96 @@ describe("/kudos", () => {
 describe("/leaderboard and /kudos-history", () => {
   it("ranks by kudos received and lists recent reasons", async () => {
     for (const [to, reason] of [
-      ["bob", "a"],
-      ["bob", "b"],
-      ["dan", "c"],
+      ["102", "a"],
+      ["102", "b"],
+      ["104", "c"],
     ] as const) {
-      await command("g6", "alice", "kudos", [user("user", to), str("reason", reason)]);
+      await command("g6", "101", "kudos", [user("user", to), str("reason", reason)]);
     }
     // An old kudos only counts toward all time.
     await runInDurableObject(env.KUDOS.getByName("g6"), (_server, state) => {
       state.storage.sql.exec(
-        "INSERT INTO kudos (channel_id, from_user, to_user, reason, created_at) VALUES ('c', 'x', 'eve', 'old', 0)",
+        "INSERT INTO kudos (channel_id, from_user, to_user, reason, created_at) VALUES ('c', '110', '<@105>', 'old', 0)",
       );
     });
 
-    const all = await command("g6", "alice", "leaderboard");
+    const all = await command("g6", "101", "leaderboard");
     expect(all.content).toBe(
-      "**Kudos leaderboard of all time**\n1. <@bob> · 2 kudos\n2. <@dan> · 1 kudos\n3. <@eve> · 1 kudos",
+      "**Kudos leaderboard of all time**\n1. <@102> · 2 kudos\n2. <@104> · 1 kudos\n3. <@105> · 1 kudos",
     );
     expect(all.allowed_mentions).toEqual({ parse: [] });
 
-    const week = await command("g6", "alice", "leaderboard", [str("period", "week")]);
-    expect(week.content).not.toContain("eve");
+    const week = await command("g6", "101", "leaderboard", [str("period", "week")]);
+    expect(week.content).not.toContain("105");
 
-    const history = await command("g6", "alice", "kudos-history", [user("user", "bob")]);
+    const history = await command("g6", "101", "kudos-history", [user("user", "102")]);
     expect(history.flags).toBe(64);
-    expect(history.content).toMatch(/^<@bob> has 2 kudos\. Most recent:\n- b \(from <@alice>/);
+    expect(history.content).toMatch(/^<@102> has 2 kudos\. Most recent:\n- b \(from <@101>/);
 
-    const empty = await command("g6", "zed", "kudos-history");
-    expect(empty.content).toBe("<@zed> has no kudos yet.");
+    const empty = await command("g6", "107", "kudos-history");
+    expect(empty.content).toBe("<@107> has no kudos yet.");
+  });
+});
+
+describe("free-text names", () => {
+  it("counts any name case-insensitively and pings nobody", async () => {
+    const first = await command("g7", "101", "kudos", [
+      str("user", "the ops team"),
+      str("reason", "uptime"),
+    ]);
+    expect(first.content).toBe("Kudos to the ops team from <@101> 🙏 (1 total)\n> uptime");
+    expect(first.allowed_mentions).toEqual({ users: [] });
+
+    const second = await command("g7", "102", "kudos", [
+      str("user", "  The  Ops Team "),
+      str("reason", "again"),
+    ]);
+    expect(second.content).toContain("(2 total)");
+
+    const history = await command("g7", "101", "kudos-history", [str("user", "the ops team")]);
+    expect(history.content).toMatch(/has 2 kudos/);
+  });
+});
+
+describe("autocomplete", () => {
+  async function suggest(guild: string, typed: string) {
+    const res = await send({
+      type: InteractionType.ApplicationCommandAutocomplete,
+      guild_id: guild,
+      channel: { id: "general" },
+      member: { user: { id: "101" } },
+      data: {
+        type: ApplicationCommandType.ChatInput,
+        name: "kudos",
+        options: [{ ...str("user", typed), focused: true }],
+        resolved: { users: {} },
+      },
+    });
+    return (await res.json<APIApplicationCommandAutocompleteResponse>()).data.choices;
+  }
+
+  it("suggests members, then past recipients, then the typed text", async () => {
+    await command("g8", "101", "kudos", [str("user", "Pizza Friday"), str("reason", "yum")]);
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () =>
+        Response.json([{ nick: "Pat", user: { id: "120", username: "pat", global_name: null } }]),
+      );
+
+    expect(await suggest("g8", "p")).toEqual([
+      { name: "Pat", value: "<@120>" },
+      { name: "Pizza Friday", value: "Pizza Friday" },
+      { name: "p", value: "p" },
+    ]);
+    expect(String(fetch.mock.calls[0]![0])).toBe(
+      "https://discord.com/api/v10/guilds/g8/members/search?query=p&limit=10",
+    );
+
+    // Once thanked, a member is suggested by name with nothing typed.
+    await command("g8", "101", "kudos", [user("user", "120"), str("reason", "help")]);
+    expect(await suggest("g8", "")).toEqual([
+      { name: "Pat", value: "<@120>" },
+      { name: "Pizza Friday", value: "Pizza Friday" },
+    ]);
   });
 });

@@ -4,18 +4,18 @@ A Discord bot for thanking people in public. Each server keeps a running count o
 
 ## Use cases
 
-| Who                   | Wants to                                             | Command                    | Result                                                                                                                         |
-| --------------------- | ---------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Anyone                | Thank someone                                        | `/kudos user reason`       | +1 for `user` in this server. Posts "Kudos to @user from @you (N total)" with the reason, in the current channel.              |
-| Anyone                | See every kudos in one place                         | (automatic)                | If the server has a kudos channel and the command ran elsewhere, the same message is also posted there, without a second ping. |
-| Anyone                | See who's been thanked most                          | `/leaderboard [period]`    | Top 10 by kudos received. `period`: last 7 days, last 30 days, or all time (default).                                          |
-| Anyone                | See why someone was thanked                          | `/kudos-history [user]`    | Their total and the five most recent reasons, visible only to the caller. Defaults to the caller.                              |
-| Admin (Manage Server) | Turn the kudos channel on, change it, or turn it off | `/kudos-channel [channel]` | Sets the channel and posts a test message there (fails loudly if the bot can't post). No channel turns it off.                 |
+| Who                   | Wants to                                             | Command                    | Result                                                                                                                                                                                                              |
+| --------------------- | ---------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Anyone                | Thank someone                                        | `/kudos user reason`       | +1 for `user` in this server. Posts "Kudos to @user from @you (N total)" with the reason, in the current channel. `user` suggests members as you type but takes any name ("the ops team"); only members get pinged. |
+| Anyone                | See every kudos in one place                         | (automatic)                | If the server has a kudos channel and the command ran elsewhere, the same message is also posted there, without a second ping.                                                                                      |
+| Anyone                | See who's been thanked most                          | `/leaderboard [period]`    | Top 10 by kudos received. `period`: last 7 days, last 30 days, or all time (default).                                                                                                                               |
+| Anyone                | See why someone was thanked                          | `/kudos-history [user]`    | Their total and the five most recent reasons, visible only to the caller. Defaults to the caller.                                                                                                                   |
+| Admin (Manage Server) | Turn the kudos channel on, change it, or turn it off | `/kudos-channel [channel]` | Sets the channel and posts a test message there (fails loudly if the bot can't post). No channel turns it off.                                                                                                      |
 
 ## Rules
 
 - Servers only: the commands don't appear in DMs.
-- No kudos to yourself. Bots can collect kudos.
+- No kudos to yourself. Bots, and any free-text name, can collect kudos. Names count case-insensitively.
 - Reason is required, 1 to 300 characters.
 - Counts are per server. They're derived from the kudos log, so the log is the only source of truth.
 
