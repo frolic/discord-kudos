@@ -6,12 +6,12 @@ It runs on one Cloudflare Worker with a D1 database, deployed with [Alchemy](htt
 
 ## Commands
 
-| Command | What it does |
-|-|-|
-| `/kudos user reason` | +1 for `user`, posted in the channel (and in the kudos channel, if one is set) |
-| `/leaderboard [period]` | Top 10 for the last 7 days, the last 30 days, or all time |
-| `/kudos-history [user]` | Someone's total and their five most recent reasons (only you see it) |
-| `/kudos-channel [channel]` | Admins: set the channel every kudos is echoed to. No channel turns it off |
+| Command                    | What it does                                                                   |
+| -------------------------- | ------------------------------------------------------------------------------ |
+| `/kudos user reason`       | +1 for `user`, posted in the channel (and in the kudos channel, if one is set) |
+| `/leaderboard [period]`    | Top 10 for the last 7 days, the last 30 days, or all time                      |
+| `/kudos-history [user]`    | Someone's total and their five most recent reasons (only you see it)           |
+| `/kudos-channel [channel]` | Admins: set the channel every kudos is echoed to. No channel turns it off      |
 
 ## Deploy your own
 
