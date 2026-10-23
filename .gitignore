@@ -1,4 +1,4 @@
-dist
-node_modules
-transpiled
-/.idea/
+node_modules/
+.alchemy/
+.wrangler/
+.env
