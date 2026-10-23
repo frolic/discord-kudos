@@ -13,6 +13,13 @@ import {
   type APIInteractionResponseChannelMessageWithSource,
 } from "discord-api-types/v10";
 import worker from "./worker.ts";
+import type { KudosEnv } from "../alchemy.run.ts";
+
+declare global {
+  namespace Cloudflare {
+    interface Env extends KudosEnv {}
+  }
+}
 
 // Private key for DISCORD_PUBLIC_KEY in wrangler.test.jsonc.
 const PRIVATE_KEY =
