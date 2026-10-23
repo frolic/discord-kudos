@@ -1,39 +1,43 @@
-# ʕ •́؈•̀) `worker-typescript-template`
+# discord-kudos
 
-A batteries included template for kick starting a TypeScript Cloudflare worker project.
+A small Discord bot for thanking people in public. `/kudos @someone reason` keeps a per-server count, and every kudos can also be echoed to one channel.
 
-## Note: You must use [wrangler](https://developers.cloudflare.com/workers/cli-wrangler/install-update) 1.17 or newer to use this template.
+It runs on one Cloudflare Worker with a D1 database, deployed with [Alchemy](https://alchemy.run). What it does and why: [SPEC.md](./SPEC.md).
 
-## 🔋 Getting Started
+## Commands
 
-This template is meant to be used with [Wrangler](https://github.com/cloudflare/wrangler). If you are not already familiar with the tool, we recommend that you install the tool and configure it to work with your [Cloudflare account](https://dash.cloudflare.com). Documentation can be found [here](https://developers.cloudflare.com/workers/tooling/wrangler/).
+| Command | What it does |
+|-|-|
+| `/kudos user reason` | +1 for `user`, posted in the channel (and in the kudos channel, if one is set) |
+| `/leaderboard [period]` | Top 10 for the last 7 days, the last 30 days, or all time |
+| `/kudos-history [user]` | Someone's total and their five most recent reasons (only you see it) |
+| `/kudos-channel [channel]` | Admins: set the channel every kudos is echoed to. No channel turns it off |
 
-To generate using Wrangler, run this command:
+## Deploy your own
+
+1. Create an app at https://discord.com/developers/applications. Note its application ID and public key, and generate a bot token (Bot → Reset Token).
+2. Create a Cloudflare API token that can edit Workers and D1.
+3. Add these GitHub Actions secrets to your fork: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `DISCORD_APPLICATION_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN`.
+4. Push to `main`. CI deploys the Worker and D1 database, then registers the slash commands.
+5. In the Discord app, set "Interactions endpoint URL" to the Worker URL printed by the deploy (`https://kudos.<your-subdomain>.workers.dev`).
+6. Invite the bot: `https://discord.com/oauth2/authorize?client_id=<APPLICATION_ID>&scope=bot+applications.commands&permissions=3072` (View Channel and Send Messages, for the kudos channel).
+
+To deploy from your machine instead, copy `.env.example` to `.env`, fill it in along with `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, and run `pnpm run deploy`.
+
+## Development
 
 ```bash
-wrangler generate my-ts-project https://github.com/cloudflare/worker-typescript-template
+pnpm install
+pnpm test        # vitest in workerd, against a local D1
+pnpm typecheck
+pnpm lint && pnpm format:check
 ```
 
-### 👩 💻 Developing
-
-[`src/index.ts`](./src/index.ts) calls the request handler in [`src/handler.ts`](./src/handler.ts), and will return the [request method](https://developer.mozilla.org/en-US/docs/Web/API/Request/method) for the given request.
-
-### 🧪 Testing
-
-This template comes with jest tests which simply test that the request handler can handle each request method. `npm test` will run your tests.
-
-### ✏️ Formatting
-
-This template uses [`prettier`](https://prettier.io/) to format the project. To invoke, run `npm run format`.
-
-### 👀 Previewing and Publishing
-
-For information on how to preview and publish your worker, please see the [Wrangler docs](https://developers.cloudflare.com/workers/tooling/wrangler/commands/#publish).
-
-## 🤢 Issues
-
-If you run into issues with this specific project, please feel free to file an issue [here](https://github.com/cloudflare/worker-typescript-template/issues). If the problem is with Wrangler, please file an issue [here](https://github.com/cloudflare/wrangler/issues).
-
-## ⚠️ Caveats
-
-The `service-worker-mock` used by the tests is not a perfect representation of the Cloudflare Workers runtime. It is a general approximation. We recommend that you test end to end with `wrangler dev` in addition to a [staging environment](https://developers.cloudflare.com/workers/tooling/wrangler/configuration/environments/) to test things before deploying.
+```
+src/worker.ts     verify the Discord signature, route to a command
+src/kudos.ts      the four command handlers
+src/commands.ts   slash command definitions (registered by scripts/register.ts)
+src/discord.ts    signature check, replies, posting to a channel
+migrations/       D1 schema
+alchemy.run.ts    Worker + D1, as code
+```
