@@ -9,8 +9,8 @@ const Worker = Cloudflare.Worker("Kudos", {
   main: "./src/worker.ts",
   env: {
     KUDOS: Cloudflare.DurableObject<Kudos>("Kudos"),
-    DISCORD_PUBLIC_KEY: Config.string("DISCORD_PUBLIC_KEY"),
-    DISCORD_BOT_TOKEN: Config.redacted("DISCORD_BOT_TOKEN"),
+    DISCORD_PUBLIC_KEY: Config.String("DISCORD_PUBLIC_KEY"),
+    DISCORD_BOT_TOKEN: Config.Redacted("DISCORD_BOT_TOKEN"),
   },
 });
 
