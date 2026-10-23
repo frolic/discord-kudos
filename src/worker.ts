@@ -37,3 +37,5 @@ export default {
     return Response.json(reply("Sorry, I don't know that one.", { ephemeral: true }));
   },
 } satisfies ExportedHandler<KudosEnv>;
+
+export { KudosServer } from "./server.ts";

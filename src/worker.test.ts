@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
+import {
+  createExecutionContext,
+  runInDurableObject,
+  waitOnExecutionContext,
+} from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import {
   ApplicationCommandOptionType,
@@ -127,7 +131,7 @@ describe("/kudos", () => {
     expect(otherServer.content).toContain("(1 total)");
   });
 
-  it("refuses self and bot kudos", async () => {
+  it("refuses self kudos but lets bots collect them", async () => {
     const self = await command("g3", "alice", "kudos", [
       user("user", "alice"),
       str("reason", "me"),
@@ -142,11 +146,7 @@ describe("/kudos", () => {
       [user("user", "robo"), str("reason", "beep")],
       ["robo"],
     );
-    expect(bot.content).toMatch(/Bots/);
-    const { n } = (await env.DB.prepare(
-      "SELECT COUNT(*) AS n FROM kudos WHERE guild_id = 'g3'",
-    ).first<{ n: number }>())!;
-    expect(n).toBe(0);
+    expect(bot.content).toContain("Kudos to <@robo> from <@alice> 🙏 (1 total)");
   });
 
   it("broadcasts to the kudos channel once one is set", async () => {
@@ -171,12 +171,14 @@ describe("/kudos", () => {
   });
 
   it("won't set a kudos channel the bot can't post in", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response("Missing Access", { status: 403 }),
-    );
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => new Response("Missing Access", { status: 403 }));
     const res = await command("g5", "admin", "kudos-channel", [chan("channel", "locked")]);
     expect(res.content).toMatch(/can't post/);
-    expect(await env.DB.prepare("SELECT * FROM guilds WHERE guild_id = 'g5'").first()).toBeNull();
+    // Nothing was saved, so a kudos isn't echoed anywhere.
+    await command("g5", "alice", "kudos", [user("user", "bob"), str("reason", "hi")]);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -190,9 +192,11 @@ describe("/leaderboard and /kudos-history", () => {
       await command("g6", "alice", "kudos", [user("user", to), str("reason", reason)]);
     }
     // An old kudos only counts toward all time.
-    await env.DB.prepare(
-      "INSERT INTO kudos (guild_id, channel_id, from_user, to_user, reason, created_at) VALUES ('g6', 'c', 'x', 'eve', 'old', 0)",
-    ).run();
+    await runInDurableObject(env.KUDOS.getByName("g6"), (_server, state) => {
+      state.storage.sql.exec(
+        "INSERT INTO kudos (channel_id, from_user, to_user, reason, created_at) VALUES ('c', 'x', 'eve', 'old', 0)",
+      );
+    });
 
     const all = await command("g6", "alice", "leaderboard");
     expect(all.content).toBe(

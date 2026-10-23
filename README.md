@@ -2,7 +2,7 @@
 
 A small Discord bot for thanking people in public. `/kudos @someone reason` keeps a per-server count, and every kudos can also be echoed to one channel.
 
-It runs on one Cloudflare Worker with a D1 database, deployed with [Alchemy](https://alchemy.run). What it does and why: [SPEC.md](./SPEC.md).
+It runs on one Cloudflare Worker, with a SQLite-backed Durable Object per Discord server so each server's data is stored separately. Deployed with [Alchemy](https://alchemy.run). What it does and why: [SPEC.md](./SPEC.md).
 
 ## Commands
 
@@ -16,9 +16,9 @@ It runs on one Cloudflare Worker with a D1 database, deployed with [Alchemy](htt
 ## Deploy your own
 
 1. Create an app at https://discord.com/developers/applications. Note its application ID and public key, and generate a bot token (Bot → Reset Token).
-2. Create a Cloudflare API token that can edit Workers and D1.
+2. Create a Cloudflare API token that can edit Workers.
 3. Add these GitHub Actions secrets to your fork: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `DISCORD_APPLICATION_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN`.
-4. Push to `main`. CI deploys the Worker and D1 database, then registers the slash commands.
+4. Push to `main`. CI deploys the Worker, then registers the slash commands.
 5. In the Discord app, set "Interactions endpoint URL" to the Worker URL printed by the deploy (`https://kudos.<your-subdomain>.workers.dev`).
 6. Invite the bot: `https://discord.com/oauth2/authorize?client_id=<APPLICATION_ID>&scope=bot+applications.commands&permissions=3072` (View Channel and Send Messages, for the kudos channel).
 
@@ -28,7 +28,7 @@ To deploy from your machine instead, copy `.env.example` to `.env`, fill it in a
 
 ```bash
 pnpm install
-pnpm test        # vitest in workerd, against a local D1
+pnpm test        # vitest in workerd, against local Durable Objects
 pnpm typecheck
 pnpm lint && pnpm format:check
 ```
@@ -38,6 +38,6 @@ src/worker.ts     verify the Discord signature, route to a command
 src/kudos.ts      the four command handlers
 src/commands.ts   slash command definitions (registered by scripts/register.ts)
 src/discord.ts    signature check, replies, posting to a channel
-migrations/       D1 schema
-alchemy.run.ts    Worker + D1, as code
+src/server.ts     the per-server Durable Object: SQLite schema and queries
+alchemy.run.ts    Worker + Durable Object binding, as code
 ```

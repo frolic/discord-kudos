@@ -15,16 +15,16 @@ A Discord bot for thanking people in public. Each server keeps a running count o
 ## Rules
 
 - Servers only: the commands don't appear in DMs.
-- No kudos to yourself or to bots.
+- No kudos to yourself. Bots can collect kudos.
 - Reason is required, 1 to 300 characters.
 - Counts are per server. They're derived from the kudos log, so the log is the only source of truth.
 
 ## Shape
 
 - One Cloudflare Worker is the Discord interactions endpoint. It checks Discord's Ed25519 signature with WebCrypto and answers each command synchronously.
-- One D1 database: `kudos` (the log) and `guilds` (the kudos channel per server).
+- One Durable Object per server, each with its own SQLite database: `kudos` (the log) and `settings` (the kudos channel). Servers never share storage.
 - The bot token is used only to post to the kudos channel and to register commands.
-- Alchemy declares the Worker and the D1 database. GitHub Actions tests every PR and deploys on push to `main`, then registers the commands with Discord. There are no PR previews, because a Discord app points at a single URL.
+- Alchemy declares the Worker and the Durable Object binding. GitHub Actions tests every PR and deploys on push to `main`, then registers the commands with Discord. There are no PR previews, because a Discord app points at a single URL.
 - No framework. `discord-api-types` provides the types.
 
 ## Not in scope (yet)

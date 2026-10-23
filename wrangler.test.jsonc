@@ -3,7 +3,8 @@
   "name": "kudos-test",
   "main": "./src/worker.ts",
   "compatibility_date": "2026-05-01",
-  "d1_databases": [{ "binding": "DB", "database_name": "kudos-test", "database_id": "test-db" }],
+  "durable_objects": { "bindings": [{ "name": "KUDOS", "class_name": "KudosServer" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["KudosServer"] }],
   "vars": {
     // Test-only keypair; the private half lives in src/worker.test.ts.
     "DISCORD_PUBLIC_KEY": "ffc89ef05be8b4a183614377b7a07efce98f6ae1e4f1d7db33302c9056bf5ee7",

@@ -13,22 +13,6 @@ type Handler = (
   ctx: ExecutionContext,
 ) => Promise<APIInteractionResponse>;
 
-interface Count {
-  n: number;
-}
-interface GuildSettings {
-  kudos_channel_id: string | null;
-}
-interface Ranked {
-  to_user: string;
-  n: number;
-}
-interface Received {
-  from_user: string;
-  reason: string;
-  created_at: number;
-}
-
 /** A string, user, or channel option's value (users and channels arrive as ids). */
 function option(interaction: Interaction, name: string): string | undefined {
   for (const o of interaction.data.options ?? []) {
@@ -51,14 +35,11 @@ const PERIODS = {
 } as const;
 const isPeriod = (value: string): value is keyof typeof PERIODS => Object.hasOwn(PERIODS, value);
 
-const countReceived = (env: KudosEnv, guild: string, user: string) =>
-  env.DB.prepare("SELECT COUNT(*) AS n FROM kudos WHERE guild_id = ?1 AND to_user = ?2")
-    .bind(guild, user)
-    .first<Count>()
-    .then((row) => row?.n ?? 0);
+/** This server's Durable Object: all of its kudos and settings live there. */
+const server = (interaction: Interaction, env: KudosEnv) =>
+  env.KUDOS.getByName(interaction.guild_id);
 
 const give: Handler = async (interaction, env, ctx) => {
-  const guild = interaction.guild_id;
   const channel = interaction.channel.id;
   const from = interaction.member.user.id;
   const to = option(interaction, "user");
@@ -66,24 +47,15 @@ const give: Handler = async (interaction, env, ctx) => {
 
   if (!to || !reason) return reply("Who, and what for?", { ephemeral: true });
   if (to === from) return reply("You can't give yourself kudos.", { ephemeral: true });
-  if (interaction.data.resolved?.users?.[to]?.bot) {
-    return reply("Bots don't collect kudos.", { ephemeral: true });
-  }
 
-  await env.DB.prepare(
-    "INSERT INTO kudos (guild_id, channel_id, from_user, to_user, reason) VALUES (?1, ?2, ?3, ?4, ?5)",
-  )
-    .bind(guild, channel, from, to, reason)
-    .run();
-  const [total, settings] = await Promise.all([
-    countReceived(env, guild, to),
-    env.DB.prepare("SELECT kudos_channel_id FROM guilds WHERE guild_id = ?1")
-      .bind(guild)
-      .first<GuildSettings>(),
-  ]);
+  const { total, kudosChannel } = await server(interaction, env).give({
+    channel,
+    from,
+    to,
+    reason,
+  });
 
   const content = `Kudos to <@${to}> from <@${from}> 🙏 (${total} total)\n> ${reason}`;
-  const kudosChannel = settings?.kudos_channel_id;
   if (kudosChannel && kudosChannel !== channel) {
     ctx.waitUntil(
       postMessage(env.DISCORD_BOT_TOKEN, kudosChannel, `${content}\nin <#${channel}>`).catch((e) =>
@@ -100,13 +72,7 @@ const leaderboard: Handler = async (interaction, env) => {
   const since = Number.isFinite(period.seconds)
     ? Math.floor(Date.now() / 1000) - period.seconds
     : 0;
-  const { results } = await env.DB.prepare(
-    `SELECT to_user, COUNT(*) AS n FROM kudos
-     WHERE guild_id = ?1 AND created_at >= ?2
-     GROUP BY to_user ORDER BY n DESC, MAX(created_at) DESC LIMIT 10`,
-  )
-    .bind(interaction.guild_id, since)
-    .all<Ranked>();
+  const results = await server(interaction, env).leaderboard(since);
 
   if (!results.length) return reply(`No kudos ${period.label} yet.`);
   const lines = results.map((r, i) => `${i + 1}. <@${r.to_user}> · ${r.n} kudos`);
@@ -114,20 +80,11 @@ const leaderboard: Handler = async (interaction, env) => {
 };
 
 const history: Handler = async (interaction, env) => {
-  const guild = interaction.guild_id;
   const user = option(interaction, "user") ?? interaction.member.user.id;
-  const [total, { results }] = await Promise.all([
-    countReceived(env, guild, user),
-    env.DB.prepare(
-      `SELECT from_user, reason, created_at FROM kudos
-       WHERE guild_id = ?1 AND to_user = ?2 ORDER BY id DESC LIMIT 5`,
-    )
-      .bind(guild, user)
-      .all<Received>(),
-  ]);
+  const { total, recent } = await server(interaction, env).history(user);
   if (!total) return reply(`<@${user}> has no kudos yet.`, { ephemeral: true });
 
-  const lines = results.map((r) => `- ${r.reason} (from <@${r.from_user}>, <t:${r.created_at}:R>)`);
+  const lines = recent.map((r) => `- ${r.reason} (from <@${r.from_user}>, <t:${r.created_at}:R>)`);
   return reply(`<@${user}> has ${total} kudos. Most recent:\n${lines.join("\n")}`, {
     ephemeral: true,
   });
@@ -148,12 +105,7 @@ const setChannel: Handler = async (interaction, env) => {
       );
     }
   }
-  await env.DB.prepare(
-    `INSERT INTO guilds (guild_id, kudos_channel_id) VALUES (?1, ?2)
-     ON CONFLICT (guild_id) DO UPDATE SET kudos_channel_id = excluded.kudos_channel_id`,
-  )
-    .bind(interaction.guild_id, channel)
-    .run();
+  await server(interaction, env).setKudosChannel(channel);
   return reply(
     channel ? `Every kudos will also be posted in <#${channel}>.` : "Kudos channel turned off.",
     { ephemeral: true },
