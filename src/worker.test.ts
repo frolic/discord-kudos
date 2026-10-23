@@ -14,14 +14,13 @@ import {
 } from "discord-api-types/v10";
 import worker from "./worker.ts";
 
-// Private half of the test keypair in wrangler.test.jsonc (PKCS#8, hex).
+// Private key for DISCORD_PUBLIC_KEY in wrangler.test.jsonc.
 const PRIVATE_KEY =
   "302e020100300506032b657004220420a9c9f0572ab7fc6ec05eab0a76115ed2d7f5579dd7e41a3c6e81dc32b40993ee";
 const toHex = (b: ArrayBuffer) =>
   [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
 const fromHex = (s: string) => Uint8Array.from(s.match(/../g)!, (b) => parseInt(b, 16));
 
-/** The parts of a Discord interaction payload the worker reads. */
 interface TestInteraction {
   type: InteractionType;
   guild_id?: string;
@@ -31,7 +30,6 @@ interface TestInteraction {
     type: ApplicationCommandType;
     name: string;
     options: Opt[];
-    resolved: { users: Record<string, { id: string; bot: boolean }> };
   };
 }
 
@@ -61,7 +59,7 @@ async function send(body: TestInteraction, sign = true) {
 }
 
 type Opt = { name: string; type: ApplicationCommandOptionType; value: string; focused?: boolean };
-// Member options are text with autocomplete; a picked member arrives as a mention.
+// A member picked from autocomplete arrives as a mention.
 const user = (name: string, id: string): Opt => ({
   name,
   type: ApplicationCommandOptionType.String,
@@ -78,13 +76,7 @@ const chan = (name: string, value: string): Opt => ({
   value,
 });
 
-async function command(
-  guild: string,
-  from: string,
-  name: string,
-  options: Opt[] = [],
-  bots: string[] = [],
-) {
+async function command(guild: string, from: string, name: string, options: Opt[] = []) {
   const res = await send({
     type: InteractionType.ApplicationCommand,
     guild_id: guild,
@@ -94,7 +86,6 @@ async function command(
       type: ApplicationCommandType.ChatInput,
       name,
       options,
-      resolved: { users: Object.fromEntries(bots.map((id) => [id, { id, bot: true }])) },
     },
   });
   expect(res.status).toBe(200);
@@ -133,22 +124,13 @@ describe("/kudos", () => {
     expect(otherServer.content).toContain("(1 total)");
   });
 
-  it("refuses self kudos but lets bots collect them", async () => {
+  it("refuses self kudos", async () => {
     const self = await command("g3", "101", "kudos", [user("user", "101"), str("reason", "me")]);
     expect(self.content).toMatch(/yourself/);
     expect(self.flags).toBe(64);
-
-    const bot = await command(
-      "g3",
-      "101",
-      "kudos",
-      [user("user", "109"), str("reason", "beep")],
-      ["109"],
-    );
-    expect(bot.content).toContain("Kudos to <@109> from <@101> 🙏 (1 total)");
   });
 
-  it("broadcasts to the kudos channel once one is set", async () => {
+  it("also posts to the kudos channel once one is set", async () => {
     const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
 
     const set = await command("g4", "108", "kudos-channel", [chan("channel", "shoutouts")]);
@@ -175,7 +157,7 @@ describe("/kudos", () => {
       .mockImplementation(async () => new Response("Missing Access", { status: 403 }));
     const res = await command("g5", "108", "kudos-channel", [chan("channel", "locked")]);
     expect(res.content).toMatch(/can't post/);
-    // Nothing was saved, so a kudos isn't echoed anywhere.
+    // Nothing was saved, so nothing else is posted.
     await command("g5", "101", "kudos", [user("user", "102"), str("reason", "hi")]);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
@@ -246,7 +228,6 @@ describe("autocomplete", () => {
         type: ApplicationCommandType.ChatInput,
         name: "kudos",
         options: [{ ...str("user", typed), focused: true }],
-        resolved: { users: {} },
       },
     });
     return (await res.json<APIApplicationCommandAutocompleteResponse>()).data.choices;

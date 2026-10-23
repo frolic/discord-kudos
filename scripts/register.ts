@@ -1,10 +1,8 @@
 /// <reference types="node" />
-// Overwrites the app's global slash commands with src/commands.ts. Runs after
-// every deploy (`pnpm run deploy`), or by hand with `pnpm run register`.
+// Replaces the app's slash commands with src/commands.ts.
 import { RouteBases, Routes } from "discord-api-types/v10";
 import { commands } from "../src/commands.ts";
 
-// Local runs read .env; CI passes the variables directly.
 try {
   process.loadEnvFile(new URL("../.env", import.meta.url));
 } catch {}

@@ -7,13 +7,12 @@ import {
   type RESTPutAPIApplicationCommandsJSONBody,
 } from "discord-api-types/v10";
 
-// Server installs only, and never in DMs: counts are per server.
+// Servers only, never DMs.
 const scope = {
   integration_types: [ApplicationIntegrationType.GuildInstall],
   contexts: [InteractionContextType.Guild],
 };
 
-/** Every slash command, as registered with Discord by scripts/register.ts. */
 export const commands: RESTPutAPIApplicationCommandsJSONBody = [
   {
     ...scope,
@@ -21,11 +20,10 @@ export const commands: RESTPutAPIApplicationCommandsJSONBody = [
     description: "Give someone kudos",
     options: [
       {
-        // Text with autocomplete rather than a User option, so it suggests
-        // members but also takes any name ("the ops team").
+        // Text with autocomplete, not a User option, so it also takes any name.
         type: ApplicationCommandOptionType.String,
         name: "user",
-        description: "Who are you thanking? Pick a member or type any name",
+        description: "A member or any name",
         required: true,
         autocomplete: true,
         max_length: 100,
@@ -65,7 +63,7 @@ export const commands: RESTPutAPIApplicationCommandsJSONBody = [
       {
         type: ApplicationCommandOptionType.String,
         name: "user",
-        description: "Whose history: a member or any name (default: yours)",
+        description: "A member or any name (default: you)",
         autocomplete: true,
         max_length: 100,
       },

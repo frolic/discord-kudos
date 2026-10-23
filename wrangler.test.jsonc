@@ -3,10 +3,10 @@
   "name": "kudos-test",
   "main": "./src/worker.ts",
   "compatibility_date": "2026-05-01",
-  "durable_objects": { "bindings": [{ "name": "KUDOS", "class_name": "KudosServer" }] },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["KudosServer"] }],
+  "durable_objects": { "bindings": [{ "name": "KUDOS", "class_name": "Kudos" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Kudos"] }],
   "vars": {
-    // Test-only keypair; the private half lives in src/worker.test.ts.
+    // The private key is in src/worker.test.ts.
     "DISCORD_PUBLIC_KEY": "ffc89ef05be8b4a183614377b7a07efce98f6ae1e4f1d7db33302c9056bf5ee7",
     "DISCORD_BOT_TOKEN": "test-token",
   },

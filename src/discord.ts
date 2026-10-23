@@ -10,7 +10,6 @@ import {
 
 const hex = (s: string) => Uint8Array.from(s.match(/../g) ?? [], (b) => parseInt(b, 16));
 
-/** Discord signs every interaction with the app's Ed25519 key; reject anything else. */
 export async function verify(request: Request, body: string, publicKey: string) {
   const signature = request.headers.get("X-Signature-Ed25519");
   const timestamp = request.headers.get("X-Signature-Timestamp");
@@ -31,7 +30,7 @@ interface ReplyOptions {
   mentions?: APIAllowedMentions;
 }
 
-/** A channel message reply. Pings nobody unless `mentions` says so. */
+/** Pings nobody unless `mentions` says so. */
 export function reply(content: string, options: ReplyOptions = {}): APIInteractionResponse {
   return {
     type: InteractionResponseType.ChannelMessageWithSource,
@@ -43,7 +42,7 @@ export function reply(content: string, options: ReplyOptions = {}): APIInteracti
   };
 }
 
-/** Posts a message to a channel as the bot. Never pings anyone. */
+/** Never pings anyone. */
 export async function postMessage(token: string, channelId: string, content: string) {
   const res = await fetch(RouteBases.api + Routes.channelMessages(channelId), {
     method: "POST",
@@ -53,11 +52,11 @@ export async function postMessage(token: string, channelId: string, content: str
   if (!res.ok) throw new Error(`Discord ${res.status}: ${await res.text()}`);
 }
 
-/** Members whose username or nickname starts with `query` (needs no privileged intent). */
-export async function searchMembers(token: string, guildId: string, query: string, limit: number) {
+/** Members whose username or nickname starts with `query`. */
+export async function searchMembers(token: string, guildId: string, query: string) {
   const url = new URL(RouteBases.api + Routes.guildMembersSearch(guildId));
   url.searchParams.set("query", query);
-  url.searchParams.set("limit", String(limit));
+  url.searchParams.set("limit", "10");
   const res = await fetch(url, { headers: { Authorization: `Bot ${token}` } });
   if (!res.ok) throw new Error(`Discord ${res.status}: ${await res.text()}`);
   return res.json<RESTGetAPIGuildMembersSearchResult>();
