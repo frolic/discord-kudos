@@ -113,14 +113,17 @@ describe("/kudos", () => {
       user("user", "102"),
       str("reason", "shipped it"),
     ]);
-    expect(first.content).toBe("<@102> from <@101>\n> shipped it");
+    expect(first.content).toBe("Kudos to <@102> 👏\n> shipped it");
+
+    const noReason = await command("g1", "104", "kudos", [user("user", "102")]);
+    expect(noReason.content).toBe("Kudos to <@102> 👏");
     expect(first.allowed_mentions).toEqual({ users: ["102"] });
 
     await command("g1", "103", "kudos", [user("user", "102"), str("reason", "reviews")]);
     await command("g2", "103", "kudos", [user("user", "102"), str("reason", "hi")]);
 
     const g1 = await command("g1", "101", "kudos-history", [user("user", "102")]);
-    expect(g1.content).toMatch(/has 2 kudos/);
+    expect(g1.content).toMatch(/has 3 kudos/);
     const g2 = await command("g2", "101", "kudos-history", [user("user", "102")]);
     expect(g2.content).toMatch(/has 1 kudos/);
   });
@@ -144,7 +147,7 @@ describe("/kudos", () => {
     expect(String(url)).toBe("https://discord.com/api/v10/channels/shoutouts/messages");
     expect(new Headers(init?.headers).get("Authorization")).toBe("Bot test-token");
     const body = JSON.parse(String(init?.body));
-    expect(body.content).toContain("pairing");
+    expect(body.content).toBe("Kudos to <@102> from <@101> 👏\n> pairing\nin <#general>");
     expect(body.allowed_mentions).toEqual({ parse: [] });
 
     await command("g4", "108", "kudos-channel");
