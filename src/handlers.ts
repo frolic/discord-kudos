@@ -55,18 +55,13 @@ const give: Handler = async (interaction, env, ctx) => {
   if (!to.user || !reason) return reply("Who, and what for?", { ephemeral: true });
   if (to.id === from) return reply("You can't give yourself kudos.", { ephemeral: true });
 
-  const { total, kudosChannel } = await kudos(env, interaction.guild_id).give(
-    channel,
-    from,
-    to.user,
-    reason,
-  );
+  const kudosChannel = await kudos(env, interaction.guild_id).give(channel, from, to.user, reason);
 
-  const content = `Kudos to ${to.user} from <@${from}> 🙏 (${total} total)\n> ${reason}`;
+  const content = `${to.user} from <@${from}>\n> ${reason}`;
   if (kudosChannel && kudosChannel !== channel) {
     ctx.waitUntil(
       postMessage(env.DISCORD_BOT_TOKEN, kudosChannel, `${content}\nin <#${channel}>`).catch((e) =>
-        console.error("Posting to the kudos channel failed", e),
+        console.error(`Posting to the kudos channel failed: ${e}`),
       ),
     );
   }
@@ -104,7 +99,7 @@ const setChannel: Handler = async (interaction, env) => {
     try {
       await postMessage(env.DISCORD_BOT_TOKEN, channel, "Kudos will be posted here. 🙏");
     } catch (e) {
-      console.error("Test post to the kudos channel failed", e);
+      console.error(`Test post to the kudos channel failed: ${e}`);
       return reply(
         `I can't post in <#${channel}>. Give me View Channel and Send Messages there, then try again.`,
         { ephemeral: true },
@@ -144,24 +139,36 @@ export async function autocomplete(
   const [found, past] = await Promise.all([
     typed
       ? searchMembers(env.DISCORD_BOT_TOKEN, guild, typed).catch((e) => {
-          console.error("Member search failed", e);
+          console.error(`Member search failed: ${e}`);
           return [];
         })
       : [],
     stub.autocomplete(typed),
   ]);
 
-  const members: Choice[] = found.map((m) => ({
-    value: `<@${m.user.id}>`,
-    name: m.nick ?? m.user.global_name ?? m.user.username,
-  }));
+  // Shown like Discord's member list: display name, then @username.
+  const members: Choice[] = found.map(({ nick, user }) => {
+    const display = nick ?? user.global_name ?? user.username;
+    return {
+      value: `<@${user.id}>`,
+      name: display === user.username ? `@${user.username}` : `${display} · @${user.username}`,
+    };
+  });
   if (members.length) ctx.waitUntil(stub.saveMemberNames(members));
 
+  // A name that matches a member's is the member, so it isn't offered twice.
+  const taken = new Set(
+    found
+      .flatMap(({ nick, user }) => [nick, user.global_name, user.username])
+      .map((n) => n?.toLowerCase()),
+  );
   const choices = new Map<string, string>();
   for (const { value, name } of [...members, ...past]) {
-    if (!choices.has(value)) choices.set(value, name);
+    if (choices.has(value) || (value === name && taken.has(name.toLowerCase()))) continue;
+    choices.set(value, name);
+    taken.add(name.toLowerCase());
   }
-  if (typed && !choices.has(typed)) choices.set(typed, typed);
+  if (typed && !taken.has(typed.toLowerCase())) choices.set(typed, typed);
 
   return {
     type: InteractionResponseType.ApplicationCommandAutocompleteResult,

@@ -34,7 +34,7 @@ export class Kudos extends DurableObject<KudosEnv> {
       to,
       reason,
     );
-    return { total: this.total(to), kudosChannel: this.kudosChannel() };
+    return this.kudosChannel();
   }
 
   leaderboard(since: number) {

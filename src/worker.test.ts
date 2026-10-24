@@ -115,20 +115,16 @@ describe("/kudos", () => {
       user("user", "102"),
       str("reason", "shipped it"),
     ]);
-    expect(first.content).toBe("Kudos to <@102> from <@101> 🙏 (1 total)\n> shipped it");
+    expect(first.content).toBe("<@102> from <@101>\n> shipped it");
     expect(first.allowed_mentions).toEqual({ users: ["102"] });
 
-    const second = await command("g1", "103", "kudos", [
-      user("user", "102"),
-      str("reason", "reviews"),
-    ]);
-    expect(second.content).toContain("(2 total)");
+    await command("g1", "103", "kudos", [user("user", "102"), str("reason", "reviews")]);
+    await command("g2", "103", "kudos", [user("user", "102"), str("reason", "hi")]);
 
-    const otherServer = await command("g2", "103", "kudos", [
-      user("user", "102"),
-      str("reason", "hi"),
-    ]);
-    expect(otherServer.content).toContain("(1 total)");
+    const g1 = await command("g1", "101", "kudos-history", [user("user", "102")]);
+    expect(g1.content).toMatch(/has 2 kudos/);
+    const g2 = await command("g2", "101", "kudos-history", [user("user", "102")]);
+    expect(g2.content).toMatch(/has 1 kudos/);
   });
 
   it("refuses self kudos", async () => {
@@ -210,14 +206,10 @@ describe("free-text names", () => {
       str("user", "the ops team"),
       str("reason", "uptime"),
     ]);
-    expect(first.content).toBe("Kudos to the ops team from <@101> 🙏 (1 total)\n> uptime");
+    expect(first.content).toBe("the ops team from <@101>\n> uptime");
     expect(first.allowed_mentions).toEqual({ users: [] });
 
-    const second = await command("g7", "102", "kudos", [
-      str("user", "  The  Ops Team "),
-      str("reason", "again"),
-    ]);
-    expect(second.content).toContain("(2 total)");
+    await command("g7", "102", "kudos", [str("user", "  The  Ops Team "), str("reason", "again")]);
 
     const history = await command("g7", "101", "kudos-history", [str("user", "the ops team")]);
     expect(history.content).toMatch(/has 2 kudos/);
@@ -249,7 +241,7 @@ describe("autocomplete", () => {
       );
 
     expect(await suggest("g8", "p")).toEqual([
-      { name: "Pat", value: "<@120>" },
+      { name: "Pat · @pat", value: "<@120>" },
       { name: "Pizza Friday", value: "Pizza Friday" },
       { name: "p", value: "p" },
     ]);
@@ -260,8 +252,16 @@ describe("autocomplete", () => {
     // Once thanked, a member is suggested by name with nothing typed.
     await command("g8", "101", "kudos", [user("user", "120"), str("reason", "help")]);
     expect(await suggest("g8", "")).toEqual([
-      { name: "Pat", value: "<@120>" },
+      { name: "Pat · @pat", value: "<@120>" },
       { name: "Pizza Friday", value: "Pizza Friday" },
     ]);
+  });
+
+  it("doesn't offer a typed name that matches a member twice", async () => {
+    await command("g9", "101", "kudos", [str("user", "pollux"), str("reason", "typed")]);
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      Response.json([{ nick: null, user: { id: "130", username: "pollux", global_name: null } }]),
+    );
+    expect(await suggest("g9", "pollux")).toEqual([{ name: "@pollux", value: "<@130>" }]);
   });
 });
