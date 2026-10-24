@@ -97,7 +97,7 @@ const setChannel: Handler = async (interaction, env) => {
   if (channel) {
     // A test post now catches a channel the bot can't post in.
     try {
-      await postMessage(env.DISCORD_BOT_TOKEN, channel, "Kudos will be posted here. 🙏");
+      await postMessage(env.DISCORD_BOT_TOKEN, channel, "Kudos will be posted here. 👏");
     } catch (e) {
       console.error(`Test post to the kudos channel failed: ${e}`);
       return reply(

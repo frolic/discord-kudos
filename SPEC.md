@@ -17,7 +17,7 @@ If a kudos channel is set, every kudos is also posted there, without pinging aga
 
 - `user` is any member of the server, bots included, picked with Discord's member picker.
 - You can't give yourself kudos.
-- Reasons are optional, up to 300 characters.
+- Reasons are optional, up to 1900 characters, so the whole message fits in one Discord message.
 - Servers only, no DMs. Each server's data is stored separately.
 
 ## How it works

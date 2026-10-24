@@ -30,7 +30,7 @@ export const commands: RESTPutAPIApplicationCommandsJSONBody = [
         name: "reason",
         description: "What for?",
         min_length: 1,
-        max_length: 300,
+        max_length: 1900,
       },
     ],
   },
