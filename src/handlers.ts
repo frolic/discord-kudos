@@ -40,9 +40,9 @@ const give: Handler = async (interaction, env, ctx) => {
   const channel = interaction.channel.id;
   const from = interaction.member.user.id;
   const to = option(interaction, "user");
-  const reason = option(interaction, "reason")?.trim() ?? "";
+  const reason = option(interaction, "reason");
 
-  if (!to) return reply("Who?", { ephemeral: true });
+  if (!to || !reason) return reply("Who, and what for?", { ephemeral: true });
   if (to === from) return reply("You can't give yourself kudos.", { ephemeral: true });
 
   const kudosChannel = await kudos(env, interaction.guild_id).give(
@@ -52,17 +52,16 @@ const give: Handler = async (interaction, env, ctx) => {
     reason,
   );
 
-  const quote = reason ? `\n> ${reason}` : "";
   if (kudosChannel && kudosChannel !== channel) {
     // This copy has no "used /kudos" header, so it names the sender.
-    const copy = `Kudos to <@${to}> from <@${from}> 👏${quote}\nin <#${channel}>`;
+    const copy = `Kudos to <@${to}> from <@${from}> 👏\n> ${reason}\nin <#${channel}>`;
     ctx.waitUntil(
       postMessage(env.DISCORD_BOT_TOKEN, kudosChannel, copy).catch((e) =>
         console.error(`Posting to the kudos channel failed: ${e}`),
       ),
     );
   }
-  return reply(`Kudos to <@${to}> 👏${quote}`, { mentions: { users: [to] } });
+  return reply(`Kudos to <@${to}> 👏\n> ${reason}`, { mentions: { users: [to] } });
 };
 
 const leaderboard: Handler = async (interaction, env) => {
@@ -83,10 +82,7 @@ const history: Handler = async (interaction, env) => {
   const { total, recent } = await kudos(env, interaction.guild_id).history(user);
   if (!total) return reply(`${user} has no kudos yet.`, { ephemeral: true });
 
-  const lines = recent.map((r) => {
-    const when = `from <@${r.from_user}>, <t:${r.created_at}:R>`;
-    return r.reason ? `- ${r.reason} (${when})` : `- ${when}`;
-  });
+  const lines = recent.map((r) => `- ${r.reason} (from <@${r.from_user}>, <t:${r.created_at}:R>)`);
   return reply(`${user} has ${total} kudos. Most recent:\n${lines.join("\n")}`, {
     ephemeral: true,
   });
