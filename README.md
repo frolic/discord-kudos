@@ -2,6 +2,12 @@
 
 A Discord bot for thanking people in public. Runs on Cloudflare Workers, deployed with [Alchemy](https://alchemy.run). See [SPEC.md](./SPEC.md).
 
+## Install
+
+Add the bot to a server: `https://discord.com/oauth2/authorize?client_id=<APPLICATION_ID>&scope=bot+applications.commands&permissions=3072`
+
+Use your app's Application ID, from its General Information page. The bot needs the `bot` scope (View Channels and Send Messages) for member autocomplete and the kudos channel.
+
 ## Commands
 
 | Command                    | What it does                                                          |
@@ -17,7 +23,7 @@ A Discord bot for thanking people in public. Runs on Cloudflare Workers, deploye
 2. Add GitHub secrets: `CLOUDFLARE_API_TOKEN` (with Workers edit access), `CLOUDFLARE_ACCOUNT_ID`, `DISCORD_APPLICATION_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN`.
 3. Push to `main`. CI deploys and registers the commands.
 4. Set the Discord app's "Interactions endpoint URL" to the deployed URL (`https://kudos.<your-subdomain>.workers.dev`).
-5. Invite the bot: `https://discord.com/oauth2/authorize?client_id=<APPLICATION_ID>&scope=bot+applications.commands&permissions=3072`
+5. Invite the bot with the [install link](#install).
 
 To deploy locally, copy `.env.example` to `.env`, add the Cloudflare values, and run `pnpm run deploy`.
 
