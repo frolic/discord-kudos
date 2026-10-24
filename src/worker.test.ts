@@ -113,7 +113,7 @@ describe("/kudos", () => {
       user("user", "102"),
       str("reason", "shipped it"),
     ]);
-    expect(first.content).toBe("<@102> from <@101>\n> shipped it");
+    expect(first.content).toBe("Kudos to <@102> 👏\n> shipped it");
     expect(first.allowed_mentions).toEqual({ users: ["102"] });
 
     await command("g1", "103", "kudos", [user("user", "102"), str("reason", "reviews")]);
@@ -144,7 +144,7 @@ describe("/kudos", () => {
     expect(String(url)).toBe("https://discord.com/api/v10/channels/shoutouts/messages");
     expect(new Headers(init?.headers).get("Authorization")).toBe("Bot test-token");
     const body = JSON.parse(String(init?.body));
-    expect(body.content).toContain("pairing");
+    expect(body.content).toBe("Kudos to <@102> from <@101> 👏\n> pairing\nin <#general>");
     expect(body.allowed_mentions).toEqual({ parse: [] });
 
     await command("g4", "108", "kudos-channel");

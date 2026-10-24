@@ -52,15 +52,16 @@ const give: Handler = async (interaction, env, ctx) => {
     reason,
   );
 
-  const content = `<@${to}> from <@${from}>\n> ${reason}`;
   if (kudosChannel && kudosChannel !== channel) {
+    // This copy has no "used /kudos" header, so it names the sender.
+    const copy = `Kudos to <@${to}> from <@${from}> 👏\n> ${reason}\nin <#${channel}>`;
     ctx.waitUntil(
-      postMessage(env.DISCORD_BOT_TOKEN, kudosChannel, `${content}\nin <#${channel}>`).catch((e) =>
+      postMessage(env.DISCORD_BOT_TOKEN, kudosChannel, copy).catch((e) =>
         console.error(`Posting to the kudos channel failed: ${e}`),
       ),
     );
   }
-  return reply(content, { mentions: { users: [to] } });
+  return reply(`Kudos to <@${to}> 👏\n> ${reason}`, { mentions: { users: [to] } });
 };
 
 const leaderboard: Handler = async (interaction, env) => {
