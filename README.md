@@ -6,16 +6,16 @@ A Discord bot for thanking people in public. Runs on Cloudflare Workers, deploye
 
 Add the bot to a server: `https://discord.com/oauth2/authorize?client_id=<APPLICATION_ID>&scope=bot+applications.commands&permissions=3072`
 
-Use your app's Application ID, from its General Information page. The bot needs the `bot` scope (View Channels and Send Messages) for member autocomplete and the kudos channel.
+Use your app's Application ID, from its General Information page. The bot needs the `bot` scope (View Channels and Send Messages) to post in the kudos channel.
 
 ## Commands
 
-| Command                    | What it does                                                          |
-| -------------------------- | --------------------------------------------------------------------- |
-| `/kudos user reason`       | +1 for a member or any name. Also posted in the kudos channel, if set |
-| `/leaderboard [period]`    | Top 10 for the last 7 days, last 30 days, or all time                 |
-| `/kudos-history [user]`    | Total and five most recent reasons (only you see it)                  |
-| `/kudos-channel [channel]` | Admins: set or clear the kudos channel                                |
+| Command                    | What it does                                              |
+| -------------------------- | --------------------------------------------------------- |
+| `/kudos user reason`       | +1 for a member. Also posted in the kudos channel, if set |
+| `/leaderboard [period]`    | Top 10 for the last 7 days, last 30 days, or all time     |
+| `/kudos-history [user]`    | Total and five most recent reasons (only you see it)      |
+| `/kudos-channel [channel]` | Admins: set or clear the kudos channel                    |
 
 ## Deploy your own
 
@@ -39,7 +39,7 @@ pnpm lint && pnpm format:check
 | File              | Contents                                           |
 | ----------------- | -------------------------------------------------- |
 | `src/worker.ts`   | Checks Discord's signature and routes each request |
-| `src/handlers.ts` | Command handlers and autocomplete                  |
+| `src/handlers.ts` | Command handlers                                   |
 | `src/commands.ts` | Command definitions                                |
 | `src/kudos.ts`    | Durable Object, one per server, with SQLite        |
 | `src/discord.ts`  | Discord API helpers                                |

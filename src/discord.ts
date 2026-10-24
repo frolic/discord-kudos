@@ -5,7 +5,6 @@ import {
   Routes,
   type APIAllowedMentions,
   type APIInteractionResponse,
-  type RESTGetAPIGuildMembersSearchResult,
 } from "discord-api-types/v10";
 
 const hex = (s: string) => Uint8Array.from(s.match(/../g) ?? [], (b) => parseInt(b, 16));
@@ -50,14 +49,4 @@ export async function postMessage(token: string, channelId: string, content: str
     body: JSON.stringify({ content, allowed_mentions: NO_PINGS }),
   });
   if (!res.ok) throw new Error(`Discord ${res.status}: ${await res.text()}`);
-}
-
-/** Members whose username or nickname starts with `query`. */
-export async function searchMembers(token: string, guildId: string, query: string) {
-  const url = new URL(RouteBases.api + Routes.guildMembersSearch(guildId));
-  url.searchParams.set("query", query);
-  url.searchParams.set("limit", "10");
-  const res = await fetch(url, { headers: { Authorization: `Bot ${token}` } });
-  if (!res.ok) throw new Error(`Discord ${res.status}: ${await res.text()}`);
-  return res.json<RESTGetAPIGuildMembersSearchResult>();
 }
