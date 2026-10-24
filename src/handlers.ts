@@ -111,7 +111,7 @@ const setChannel: Handler = async (interaction, env) => {
 
 export const handlers = {
   kudos: give,
-  leaderboard,
+  "kudos-leaderboard": leaderboard,
   "kudos-history": history,
   "kudos-channel": setChannel,
 } satisfies Record<string, Handler>;

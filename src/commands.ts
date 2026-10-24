@@ -37,7 +37,7 @@ export const commands: RESTPutAPIApplicationCommandsJSONBody = [
   },
   {
     ...scope,
-    name: "leaderboard",
+    name: "kudos-leaderboard",
     description: "Who has received the most kudos",
     options: [
       {

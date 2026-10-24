@@ -10,12 +10,12 @@ Use your app's Application ID, from its General Information page. The bot needs 
 
 ## Commands
 
-| Command                    | What it does                                              |
-| -------------------------- | --------------------------------------------------------- |
-| `/kudos user reason`       | +1 for a member. Also posted in the kudos channel, if set |
-| `/leaderboard [period]`    | Top 10 for the last 7 days, last 30 days, or all time     |
-| `/kudos-history [user]`    | Total and five most recent reasons (only you see it)      |
-| `/kudos-channel [channel]` | Admins: set or clear the kudos channel                    |
+| Command                       | What it does                                              |
+| ----------------------------- | --------------------------------------------------------- |
+| `/kudos user reason`          | +1 for a member. Also posted in the kudos channel, if set |
+| `/kudos-leaderboard [period]` | Top 10 for the last 7 days, last 30 days, or all time     |
+| `/kudos-history [user]`       | Total and five most recent reasons (only you see it)      |
+| `/kudos-channel [channel]`    | Admins: set or clear the kudos channel                    |
 
 ## Deploy your own
 

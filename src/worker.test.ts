@@ -165,7 +165,7 @@ describe("/kudos", () => {
   });
 });
 
-describe("/leaderboard and /kudos-history", () => {
+describe("/kudos-leaderboard and /kudos-history", () => {
   it("ranks by kudos received and lists recent reasons", async () => {
     for (const [to, reason] of [
       ["102", "a"],
@@ -181,13 +181,13 @@ describe("/leaderboard and /kudos-history", () => {
       );
     });
 
-    const all = await command("g6", "101", "leaderboard");
+    const all = await command("g6", "101", "kudos-leaderboard");
     expect(all.content).toBe(
       "**Kudos leaderboard of all time**\n1. <@102> · 2 kudos\n2. <@104> · 1 kudos\n3. <@105> · 1 kudos",
     );
     expect(all.allowed_mentions).toEqual({ parse: [] });
 
-    const week = await command("g6", "101", "leaderboard", [str("period", "week")]);
+    const week = await command("g6", "101", "kudos-leaderboard", [str("period", "week")]);
     expect(week.content).not.toContain("105");
 
     const history = await command("g6", "101", "kudos-history", [user("user", "102")]);
