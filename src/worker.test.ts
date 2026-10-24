@@ -9,7 +9,6 @@ import {
   ApplicationCommandOptionType,
   ApplicationCommandType,
   InteractionType,
-  type APIApplicationCommandAutocompleteResponse,
   type APIInteractionResponseChannelMessageWithSource,
 } from "discord-api-types/v10";
 import worker from "./worker.ts";
@@ -21,7 +20,7 @@ declare global {
   }
 }
 
-// Private key for DISCORD_PUBLIC_KEY in wrangler.test.jsonc.
+// Private key for DISCORD_PUBLIC_KEY in vitest.config.ts.
 const PRIVATE_KEY =
   "302e020100300506032b657004220420a9c9f0572ab7fc6ec05eab0a76115ed2d7f5579dd7e41a3c6e81dc32b40993ee";
 const toHex = (b: ArrayBuffer) =>
@@ -65,12 +64,11 @@ async function send(body: TestInteraction, sign = true) {
   return res;
 }
 
-type Opt = { name: string; type: ApplicationCommandOptionType; value: string; focused?: boolean };
-// A member picked from autocomplete arrives as a mention.
+type Opt = { name: string; type: ApplicationCommandOptionType; value: string };
 const user = (name: string, id: string): Opt => ({
   name,
-  type: ApplicationCommandOptionType.String,
-  value: `<@${id}>`,
+  type: ApplicationCommandOptionType.User,
+  value: id,
 });
 const str = (name: string, value: string): Opt => ({
   name,
@@ -197,71 +195,5 @@ describe("/leaderboard and /kudos-history", () => {
 
     const empty = await command("g6", "107", "kudos-history");
     expect(empty.content).toBe("<@107> has no kudos yet.");
-  });
-});
-
-describe("free-text names", () => {
-  it("counts any name case-insensitively and pings nobody", async () => {
-    const first = await command("g7", "101", "kudos", [
-      str("user", "the ops team"),
-      str("reason", "uptime"),
-    ]);
-    expect(first.content).toBe("the ops team from <@101>\n> uptime");
-    expect(first.allowed_mentions).toEqual({ users: [] });
-
-    await command("g7", "102", "kudos", [str("user", "  The  Ops Team "), str("reason", "again")]);
-
-    const history = await command("g7", "101", "kudos-history", [str("user", "the ops team")]);
-    expect(history.content).toMatch(/has 2 kudos/);
-  });
-});
-
-describe("autocomplete", () => {
-  async function suggest(guild: string, typed: string) {
-    const res = await send({
-      type: InteractionType.ApplicationCommandAutocomplete,
-      guild_id: guild,
-      channel: { id: "general" },
-      member: { user: { id: "101" } },
-      data: {
-        type: ApplicationCommandType.ChatInput,
-        name: "kudos",
-        options: [{ ...str("user", typed), focused: true }],
-      },
-    });
-    return (await res.json<APIApplicationCommandAutocompleteResponse>()).data.choices;
-  }
-
-  it("suggests members, then past recipients, then the typed text", async () => {
-    await command("g8", "101", "kudos", [str("user", "Pizza Friday"), str("reason", "yum")]);
-    const fetch = vi
-      .spyOn(globalThis, "fetch")
-      .mockImplementation(async () =>
-        Response.json([{ nick: "Pat", user: { id: "120", username: "pat", global_name: null } }]),
-      );
-
-    expect(await suggest("g8", "p")).toEqual([
-      { name: "Pat · @pat", value: "<@120>" },
-      { name: "Pizza Friday", value: "Pizza Friday" },
-      { name: "p", value: "p" },
-    ]);
-    expect(String(fetch.mock.calls[0]![0])).toBe(
-      "https://discord.com/api/v10/guilds/g8/members/search?query=p&limit=10",
-    );
-
-    // Once thanked, a member is suggested by name with nothing typed.
-    await command("g8", "101", "kudos", [user("user", "120"), str("reason", "help")]);
-    expect(await suggest("g8", "")).toEqual([
-      { name: "Pat · @pat", value: "<@120>" },
-      { name: "Pizza Friday", value: "Pizza Friday" },
-    ]);
-  });
-
-  it("doesn't offer a typed name that matches a member twice", async () => {
-    await command("g9", "101", "kudos", [str("user", "pollux"), str("reason", "typed")]);
-    vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
-      Response.json([{ nick: null, user: { id: "130", username: "pollux", global_name: null } }]),
-    );
-    expect(await suggest("g9", "pollux")).toEqual([{ name: "@pollux", value: "<@130>" }]);
   });
 });

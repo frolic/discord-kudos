@@ -15,7 +15,7 @@ If a kudos channel is set, every kudos is also posted there, without pinging aga
 
 ## Rules
 
-- `user` suggests members as you type but accepts any name, such as "the ops team". Names ignore case.
+- `user` is any member of the server, bots included, picked with Discord's member picker.
 - You can't give yourself kudos.
 - Reasons are 1 to 300 characters.
 - Servers only, no DMs. Each server's data is stored separately.

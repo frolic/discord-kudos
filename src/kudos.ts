@@ -2,21 +2,17 @@ import { DurableObject } from "cloudflare:workers";
 import type { KudosEnv } from "../alchemy.run.ts";
 
 // One instance per Discord server, each with its own SQLite database.
-// `to_user` is a member's mention (`<@id>`) or any other name as typed.
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS kudos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     channel_id TEXT NOT NULL,
     from_user TEXT NOT NULL,
-    to_user TEXT NOT NULL COLLATE NOCASE,
+    to_user TEXT NOT NULL,
     reason TEXT NOT NULL,
     created_at INTEGER NOT NULL DEFAULT (unixepoch())
   );
   CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
-  CREATE TABLE IF NOT EXISTS member_names (user TEXT PRIMARY KEY, name TEXT NOT NULL);
 `;
-
-export type Choice = { value: string; name: string };
 
 export class Kudos extends DurableObject<KudosEnv> {
   private sql = this.ctx.storage.sql;
@@ -55,30 +51,6 @@ export class Kudos extends DurableObject<KudosEnv> {
       )
       .toArray();
     return { total: this.total(user), recent };
-  }
-
-  /** Past recipients whose name starts with `prefix`, most recent first. */
-  autocomplete(prefix: string) {
-    return this.sql
-      .exec<Choice>(
-        `SELECT k.to_user AS value, COALESCE(m.name, k.to_user) AS name FROM kudos k
-         LEFT JOIN member_names m ON m.user = k.to_user
-         WHERE (m.name IS NOT NULL OR k.to_user NOT LIKE '<@%')
-           AND COALESCE(m.name, k.to_user) LIKE ? ESCAPE '\\'
-         GROUP BY k.to_user ORDER BY MAX(k.id) DESC LIMIT 25`,
-        `${prefix.replace(/[\\%_]/g, "\\$&")}%`,
-      )
-      .toArray();
-  }
-
-  saveMemberNames(members: Choice[]) {
-    for (const { value, name } of members) {
-      this.sql.exec(
-        "INSERT INTO member_names (user, name) VALUES (?, ?) ON CONFLICT (user) DO UPDATE SET name = excluded.name",
-        value,
-        name,
-      );
-    }
   }
 
   setKudosChannel(channel: string | null) {
