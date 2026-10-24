@@ -29,7 +29,6 @@ export const commands: RESTPutAPIApplicationCommandsJSONBody = [
         type: ApplicationCommandOptionType.String,
         name: "reason",
         description: "What for?",
-        required: true,
         min_length: 1,
         max_length: 300,
       },
