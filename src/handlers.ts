@@ -146,17 +146,29 @@ export async function autocomplete(
     stub.autocomplete(typed),
   ]);
 
-  const members: Choice[] = found.map((m) => ({
-    value: `<@${m.user.id}>`,
-    name: m.nick ?? m.user.global_name ?? m.user.username,
-  }));
+  // Shown like Discord's member list: display name, then @username.
+  const members: Choice[] = found.map(({ nick, user }) => {
+    const display = nick ?? user.global_name ?? user.username;
+    return {
+      value: `<@${user.id}>`,
+      name: display === user.username ? `@${user.username}` : `${display} · @${user.username}`,
+    };
+  });
   if (members.length) ctx.waitUntil(stub.saveMemberNames(members));
 
+  // A name that matches a member's is the member, so it isn't offered twice.
+  const taken = new Set(
+    found
+      .flatMap(({ nick, user }) => [nick, user.global_name, user.username])
+      .map((n) => n?.toLowerCase()),
+  );
   const choices = new Map<string, string>();
   for (const { value, name } of [...members, ...past]) {
-    if (!choices.has(value)) choices.set(value, name);
+    if (choices.has(value) || (value === name && taken.has(name.toLowerCase()))) continue;
+    choices.set(value, name);
+    taken.add(name.toLowerCase());
   }
-  if (typed && !choices.has(typed)) choices.set(typed, typed);
+  if (typed && !taken.has(typed.toLowerCase())) choices.set(typed, typed);
 
   return {
     type: InteractionResponseType.ApplicationCommandAutocompleteResult,

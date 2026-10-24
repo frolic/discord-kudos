@@ -241,7 +241,7 @@ describe("autocomplete", () => {
       );
 
     expect(await suggest("g8", "p")).toEqual([
-      { name: "Pat", value: "<@120>" },
+      { name: "Pat · @pat", value: "<@120>" },
       { name: "Pizza Friday", value: "Pizza Friday" },
       { name: "p", value: "p" },
     ]);
@@ -252,8 +252,16 @@ describe("autocomplete", () => {
     // Once thanked, a member is suggested by name with nothing typed.
     await command("g8", "101", "kudos", [user("user", "120"), str("reason", "help")]);
     expect(await suggest("g8", "")).toEqual([
-      { name: "Pat", value: "<@120>" },
+      { name: "Pat · @pat", value: "<@120>" },
       { name: "Pizza Friday", value: "Pizza Friday" },
     ]);
+  });
+
+  it("doesn't offer a typed name that matches a member twice", async () => {
+    await command("g9", "101", "kudos", [str("user", "pollux"), str("reason", "typed")]);
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      Response.json([{ nick: null, user: { id: "130", username: "pollux", global_name: null } }]),
+    );
+    expect(await suggest("g9", "pollux")).toEqual([{ name: "@pollux", value: "<@130>" }]);
   });
 });
