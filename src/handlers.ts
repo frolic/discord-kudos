@@ -55,18 +55,13 @@ const give: Handler = async (interaction, env, ctx) => {
   if (!to.user || !reason) return reply("Who, and what for?", { ephemeral: true });
   if (to.id === from) return reply("You can't give yourself kudos.", { ephemeral: true });
 
-  const { total, kudosChannel } = await kudos(env, interaction.guild_id).give(
-    channel,
-    from,
-    to.user,
-    reason,
-  );
+  const kudosChannel = await kudos(env, interaction.guild_id).give(channel, from, to.user, reason);
 
-  const content = `Kudos to ${to.user} from <@${from}> 🙏 (${total} total)\n> ${reason}`;
+  const content = `${to.user} from <@${from}>\n> ${reason}`;
   if (kudosChannel && kudosChannel !== channel) {
     ctx.waitUntil(
       postMessage(env.DISCORD_BOT_TOKEN, kudosChannel, `${content}\nin <#${channel}>`).catch((e) =>
-        console.error("Posting to the kudos channel failed", e),
+        console.error(`Posting to the kudos channel failed: ${e}`),
       ),
     );
   }
@@ -104,7 +99,7 @@ const setChannel: Handler = async (interaction, env) => {
     try {
       await postMessage(env.DISCORD_BOT_TOKEN, channel, "Kudos will be posted here. 🙏");
     } catch (e) {
-      console.error("Test post to the kudos channel failed", e);
+      console.error(`Test post to the kudos channel failed: ${e}`);
       return reply(
         `I can't post in <#${channel}>. Give me View Channel and Send Messages there, then try again.`,
         { ephemeral: true },
@@ -144,7 +139,7 @@ export async function autocomplete(
   const [found, past] = await Promise.all([
     typed
       ? searchMembers(env.DISCORD_BOT_TOKEN, guild, typed).catch((e) => {
-          console.error("Member search failed", e);
+          console.error(`Member search failed: ${e}`);
           return [];
         })
       : [],
