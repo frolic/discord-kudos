@@ -29,6 +29,7 @@ export const commands: RESTPutAPIApplicationCommandsJSONBody = [
         type: ApplicationCommandOptionType.String,
         name: "reason",
         description: "What for?",
+        required: true,
         min_length: 1,
         max_length: 1000,
       },
@@ -36,7 +37,7 @@ export const commands: RESTPutAPIApplicationCommandsJSONBody = [
   },
   {
     ...scope,
-    name: "leaderboard",
+    name: "kudos-leaderboard",
     description: "Who has received the most kudos",
     options: [
       {
