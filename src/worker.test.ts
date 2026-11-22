@@ -109,16 +109,13 @@ describe("interactions endpoint", () => {
 
 describe("/kudos", () => {
   it("counts per user per server and pings only the receiver", async () => {
-    const first = await command("g1", "101", "kudos", [
-      user("user", "102"),
-      str("reason", "shipped it"),
-    ]);
+    const first = await command("g1", "101", "kudos", [str("for", "<@102> shipped it")]);
     expect(first.content).toBe("Kudos to <@102> 👏\n> shipped it");
 
     expect(first.allowed_mentions).toEqual({ users: ["102"] });
 
-    await command("g1", "103", "kudos", [user("user", "102"), str("reason", "reviews")]);
-    await command("g2", "103", "kudos", [user("user", "102"), str("reason", "hi")]);
+    await command("g1", "103", "kudos", [str("for", "<@102> reviews")]);
+    await command("g2", "103", "kudos", [str("for", "<@102> hi")]);
 
     const g1 = await command("g1", "101", "kudos-history", [user("user", "102")]);
     expect(g1.content).toMatch(/has 2 kudos/);
@@ -127,9 +124,56 @@ describe("/kudos", () => {
   });
 
   it("refuses self kudos", async () => {
-    const self = await command("g3", "101", "kudos", [user("user", "101"), str("reason", "me")]);
+    const self = await command("g3", "101", "kudos", [str("for", "<@101> me")]);
     expect(self.content).toMatch(/yourself/);
     expect(self.flags).toBe(64);
+  });
+
+  it("counts every mentioned person, and strips them out of the reason", async () => {
+    const res = await command("g7", "101", "kudos", [
+      str("for", "<@102> <@103> thanks for the review"),
+    ]);
+    expect(res.content).toBe("Kudos to <@102> <@103> 👏\n> thanks for the review");
+    expect(res.allowed_mentions).toEqual({ users: ["102", "103"] });
+
+    // Both recipients were credited.
+    for (const to of ["102", "103"]) {
+      const history = await command("g7", "101", "kudos-history", [user("user", to)]);
+      expect(history.content).toMatch(/has 1 kudos/);
+    }
+  });
+
+  it("counts a person mentioned twice only once", async () => {
+    const res = await command("g8", "101", "kudos", [str("for", "<@102> and <@102> again — nice")]);
+    expect(res.content).toBe("Kudos to <@102> 👏\n> and again — nice");
+    const history = await command("g8", "101", "kudos-history", [user("user", "102")]);
+    expect(history.content).toMatch(/has 1 kudos/);
+  });
+
+  it("accepts nicknamed mentions (<@!id>)", async () => {
+    const res = await command("g9", "101", "kudos", [str("for", "<@!102> solid debugging")]);
+    expect(res.content).toBe("Kudos to <@102> 👏\n> solid debugging");
+    expect(res.allowed_mentions).toEqual({ users: ["102"] });
+  });
+
+  it("ignores the sender when they mention themselves alongside others", async () => {
+    const res = await command("g10", "101", "kudos", [str("for", "<@101> <@102> team effort")]);
+    expect(res.content).toBe("Kudos to <@102> 👏\n> team effort");
+    expect(res.allowed_mentions).toEqual({ users: ["102"] });
+  });
+
+  it("asks for a mention when there is none, and for a reason when there is only mentions", async () => {
+    const noMention = await command("g11", "101", "kudos", [str("for", "thanks everyone")]);
+    expect(noMention.content).toMatch(/Mention at least one person/);
+    expect(noMention.flags).toBe(64);
+
+    const noReason = await command("g11", "101", "kudos", [str("for", "<@102>")]);
+    expect(noReason.content).toMatch(/What for\?/);
+    expect(noReason.flags).toBe(64);
+
+    // Neither attempt created a kudos.
+    const history = await command("g11", "101", "kudos-history", [user("user", "102")]);
+    expect(history.content).toMatch(/has no kudos yet/);
   });
 
   it("also posts to the kudos channel once one is set", async () => {
@@ -139,7 +183,7 @@ describe("/kudos", () => {
     expect(set.content).toContain("<#shoutouts>");
     expect(fetch).toHaveBeenCalledTimes(1); // the test post
 
-    await command("g4", "101", "kudos", [user("user", "102"), str("reason", "pairing")]);
+    await command("g4", "101", "kudos", [str("for", "<@102> pairing")]);
     expect(fetch).toHaveBeenCalledTimes(2);
     const [url, init] = fetch.mock.calls[1]!;
     expect(String(url)).toBe("https://discord.com/api/v10/channels/shoutouts/messages");
@@ -149,7 +193,7 @@ describe("/kudos", () => {
     expect(body.allowed_mentions).toEqual({ parse: [] });
 
     await command("g4", "108", "kudos-channel");
-    await command("g4", "101", "kudos", [user("user", "102"), str("reason", "again")]);
+    await command("g4", "101", "kudos", [str("for", "<@102> again")]);
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
@@ -160,7 +204,7 @@ describe("/kudos", () => {
     const res = await command("g5", "108", "kudos-channel", [chan("channel", "locked")]);
     expect(res.content).toMatch(/can't post/);
     // Nothing was saved, so nothing else is posted.
-    await command("g5", "101", "kudos", [user("user", "102"), str("reason", "hi")]);
+    await command("g5", "101", "kudos", [str("for", "<@102> hi")]);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
@@ -172,7 +216,7 @@ describe("/kudos-leaderboard and /kudos-history", () => {
       ["102", "b"],
       ["104", "c"],
     ] as const) {
-      await command("g6", "101", "kudos", [user("user", to), str("reason", reason)]);
+      await command("g6", "101", "kudos", [str("for", `<@${to}> ${reason}`)]);
     }
     // An old kudos only counts toward all time.
     await runInDurableObject(env.KUDOS.getByName("g6"), (_server, state) => {
