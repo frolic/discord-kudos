@@ -5,6 +5,7 @@ import {
 } from "discord-api-types/v10";
 import type { KudosEnv } from "../alchemy.run.ts";
 import { postMessage, reply } from "./discord.ts";
+import { parseMentions, stripMentions } from "./mentions.ts";
 
 type Interaction = APIChatInputApplicationCommandGuildInteraction;
 type Handler = (
@@ -39,29 +40,44 @@ const kudos = (env: KudosEnv, guild: string) => env.KUDOS.getByName(guild);
 const give: Handler = async (interaction, env, ctx) => {
   const channel = interaction.channel.id;
   const from = interaction.member.user.id;
-  const to = option(interaction, "user");
-  const reason = option(interaction, "reason");
+  const text = option(interaction, "for");
 
-  if (!to || !reason) return reply("Who, and what for?", { ephemeral: true });
-  if (to === from) return reply("You can't give yourself kudos.", { ephemeral: true });
+  if (!text) return reply("Who, and what for?", { ephemeral: true });
 
-  const kudosChannel = await kudos(env, interaction.guild_id).give(
-    channel,
-    from,
-    `<@${to}>`,
-    reason,
-  );
+  // Every mention is a recipient; the rest of the text is the reason.
+  const mentioned = parseMentions(text);
+  const recipients = mentioned.filter((id) => id !== from);
+  const reason = stripMentions(text);
+
+  if (!recipients.length) {
+    return reply(
+      mentioned.length > 0
+        ? "You can't give yourself kudos."
+        : "Mention at least one person to thank.",
+      { ephemeral: true },
+    );
+  }
+  if (!reason) return reply("What for? Add a reason after the mentions.", { ephemeral: true });
+
+  const store = kudos(env, interaction.guild_id);
+  // One row per recipient, so the leaderboard counts each of them.
+  let kudosChannel: string | null = null;
+  for (const to of recipients) {
+    kudosChannel = await store.give(channel, from, `<@${to}>`, reason);
+  }
+
+  const to = recipients.map((id) => `<@${id}>`).join(" ");
 
   if (kudosChannel && kudosChannel !== channel) {
     // This copy has no "used /kudos" header, so it names the sender.
-    const copy = `Kudos to <@${to}> from <@${from}> 👏\n> ${reason}\nin <#${channel}>`;
+    const copy = `Kudos to ${to} from <@${from}> 👏\n> ${reason}\nin <#${channel}>`;
     ctx.waitUntil(
       postMessage(env.DISCORD_BOT_TOKEN, kudosChannel, copy).catch((e) =>
         console.error(`Posting to the kudos channel failed: ${e}`),
       ),
     );
   }
-  return reply(`Kudos to <@${to}> 👏\n> ${reason}`, { mentions: { users: [to] } });
+  return reply(`Kudos to ${to} 👏\n> ${reason}`, { mentions: { users: recipients } });
 };
 
 const leaderboard: Handler = async (interaction, env) => {

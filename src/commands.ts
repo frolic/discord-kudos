@@ -20,15 +20,13 @@ export const commands: RESTPutAPIApplicationCommandsJSONBody = [
     description: "Give someone kudos",
     options: [
       {
-        type: ApplicationCommandOptionType.User,
-        name: "user",
-        description: "Who are you thanking?",
-        required: true,
-      },
-      {
+        // One field: mention who you're thanking, then say what for. Discord
+        // autocompletes @-mentions as you type, so the mentions arrive as
+        // `<@id>` markup and the handler parses them back out. Discord
+        // requires every option to have a name; this is the only one.
         type: ApplicationCommandOptionType.String,
-        name: "reason",
-        description: "What for?",
+        name: "for",
+        description: "Who and what for — @mention people, then say why",
         required: true,
         min_length: 1,
         max_length: 1000,
